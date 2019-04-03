@@ -8,6 +8,8 @@ import org.apache.spark.sql.streaming.Trigger;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.SQLContext.implicits$;
 
+import static org.apache.arrow.flatbuf.Type.Map;
+
 public class Main {
 
     public static Dataset<Row> generateStream(SparkSession spark) {
@@ -54,7 +56,15 @@ public class Main {
                         data.col("playerID")
                 ).max("level")
                 .orderBy("window");
+
         return windowedCounts;
+    }
+
+    public static Dataset<Row> leaderboard(Dataset<Row> data) {
+        Dataset<Row> leaderboard = data
+                .groupBy("playerID")
+                .max("level");
+        return leaderboard;
     }
 
     public static StreamingQuery generateQuery(Dataset<Row> data) {
@@ -64,10 +74,12 @@ public class Main {
                 .format("console")
                 .option("truncate", "false")
                 .option("numRows", 100)
-                //.trigger(Trigger.ProcessingTime("10 seconds"))
+                //.trigger(Trigger.ProcessingTime("5 minutes"))
                 .start();
         return query;
     }
+
+
 
 
     public static void main(String[] args) throws StreamingQueryException {
@@ -78,7 +90,7 @@ public class Main {
                 .getOrCreate();
         spark.sparkContext().setLogLevel("ERROR");
         Dataset<Row> streamData = generateStream(spark);
-        Dataset<Row> team1 = statefulAggregation(streamData);
+        Dataset<Row> team1 = leaderboard(streamData);
         StreamingQuery query  = generateQuery(team1);
 
         query.awaitTermination();
